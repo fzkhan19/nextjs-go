@@ -1,3 +1,4 @@
+import {addUser, deleteUser, editUser, getUsers} from "@/api/api";
 import {Button} from "@/components/ui/button";
 import {
   Card,
@@ -21,62 +22,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import axios from "axios";
 import {MoreHorizontal} from "lucide-react";
 import {revalidateTag} from "next/cache";
 import {AddDialog} from "./AddDialog";
 import {DeleteDialog} from "./DeleteDialog";
 import {EditDialog} from "./EditDialog";
 
-const getUsers = async () => {
-  try {
-    const response = await fetch(process.env.NEXT_PUBLIC_API_URL + "/users", {
-      next: { tags: ["users"] },
-    });
-    const users = await response.json();
-    return users;
-  } catch (error) {
-    console.error(error);
-    return [];
-  }
-};
-const editUser = async (user: any) => {
-  "use server";
-  try {
-    const response = await axios.put(
-      process.env.NEXT_PUBLIC_API_URL + "/users/" + user.id,
-      user
-    );
-    revalidateTag('users')
-    return response.data;
-  } catch (error) {
-    console.error(error);
-  }
-};
-
-const deleteUser = async (userId: number) => {
-  "use server";
-  try {
-    await axios.delete(process.env.NEXT_PUBLIC_API_URL + "/users/" + userId);
-    revalidateTag('users')
-  } catch (error) {
-    console.error(error);
-  }
-};
-
-const addUser = async (user: any) => {
-  "use server";
-  try {
-    const response = await axios.post(process.env.NEXT_PUBLIC_API_URL + "/users", user);
-    revalidateTag('users')
-    return response.data;
-  } catch (error) {
-    console.error(error);
-  }
-};
 
 export async function Dashboard() {
   // Fetch the users using the `use` hook
+  revalidateTag("users");
   const users = await getUsers();
 
   return (

@@ -1,41 +1,56 @@
-# Stage 1: Build the Next.js application
-FROM oven/bun:alpine as builder
+FROM oven/bun AS base
 
-# Set the working directory
+# Install dependencies only when needed
+FROM base AS deps
+
 WORKDIR /app
-
-# Copy package.json and bun.lockb to the working directory
-COPY package.json ./
-COPY bun.lockb ./
 
 # Install dependencies
-RUN bun install
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
 
-# Copy the rest of the application code
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build the Next.js application
+# Next.js collects completely anonymous telemetry data about general usage.
+# Learn more here: https://nextjs.org/telemetry
+# Disable telemetry during the build
+ENV NEXT_TELEMETRY_DISABLED 1
+
 RUN bun run build
 
-# Stage 2: Serve the Next.js application
-FROM oven/bun:alpine
-
-# Set the working directory
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
 
-# Copy package.json and bun.lockb
-COPY package.json bun.lockb ./
+ENV NODE_ENV production
 
-# Install production dependencies
-RUN bun install --production
+# Disable telemetry
+ENV NEXT_TELEMETRY_DISABLED 1
 
-# Copy the built application from the builder stage
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/next.config.mjs ./
-COPY --from=builder /app/package.json ./
+RUN adduser --system --uid 1001 nextjs
 
-# Expose the port the app runs on
+COPY --from=builder /app/public ./public
+
+# Set the correct permission for prerender cache
+RUN mkdir .next
+RUN chown nextjs:bun .next
+
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=builder --chown=nextjs:bun /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:bun /app/.next/static ./.next/static
+
+USER nextjs
+
 EXPOSE 3000
 
-# Start the Next.js application
-CMD ["bun", "start"]
+ENV PORT 3000
+
+# Set hostname to localhost
+ENV HOSTNAME "0.0.0.0"
+
+CMD ["bun", "server.js"]
